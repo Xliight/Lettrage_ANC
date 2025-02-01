@@ -17,12 +17,12 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 
 public class OrderProcessor {
-
-
 
     public  static boolean isValidExcelFile(MultipartFile file) {
         return Objects.equals(file.getContentType(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" );
@@ -129,4 +129,105 @@ public class OrderProcessor {
 
         return null;
     }
+
+    public static   Map<String, Map<String, Map<String, List<Order>>>> SortData(List<Order> orders){
+       return orders.stream()
+                .sorted(Comparator.comparing(Order::getDateTransaction, Comparator.nullsLast(Comparator.reverseOrder()))) // Sort from oldest to newest
+                .collect(Collectors.groupingBy(
+                        Order::getCompteClient, // Group by compteClient
+                        LinkedHashMap::new,
+                        Collectors.groupingBy(
+                                Order::getProfilValidation, // Group by profilValidation
+                                LinkedHashMap::new,
+                                Collectors.groupingBy(
+                                        order -> extractFacturePrefix(order.getFacture()), // Group by the first 4 digits of facture
+                                        LinkedHashMap::new,
+                                        Collectors.collectingAndThen(
+                                                Collectors.toList(),
+                                                list -> list.stream()
+                                                        .sorted(Comparator.comparing(Order::getDateTransaction, Comparator.nullsLast(Comparator.reverseOrder()))) // Sort by dateTransaction (oldest to newest)
+                                                        .collect(Collectors.toList())
+                                        )
+                                )
+                        )
+                ));
+
+
+    }
+    public static List<Order> convertToSortedOrderEntities(Map<String, Map<String, Map<String, List<Order>>>> groupedOrders) {
+        List<Order> OrderEntities = new ArrayList<>();
+
+        for (Map.Entry<String, Map<String, Map<String, List<Order>>>> compteClientEntry : groupedOrders.entrySet()) {
+            for (Map.Entry<String, Map<String, List<Order>>> profilValidationEntry : compteClientEntry.getValue().entrySet()) {
+                for (Map.Entry<String, List<Order>> factureEntry : profilValidationEntry.getValue().entrySet()) {
+                    List<Order> orders = factureEntry.getValue();
+                    for (Order order : orders) {
+                        Order sortedOrder = convertToSortedOrder(order);
+                        OrderEntities.add(sortedOrder); // Add to the list for batch save
+                    }
+                }
+            }
+        }
+
+        return OrderEntities;
+    }
+
+    public static Order convertToSortedOrder(Order order) {
+        return Order.builder()
+                .compteClient(order.getCompteClient())
+                .profilValidation(String.valueOf(order.getProfilValidation()))
+                .montant(order.getMontant())
+                .montantRegle(order.getMontantRegle())
+                .devise(order.getDevise())
+                .settlement(order.getSettlement())
+                .numeroDocument(order.getNumeroDocument())
+                .ordrePaiement(order.getOrdrePaiement())
+                .dateDocument(order.getDateDocument())
+                .documentNum(order.getDocumentNum())
+                .dateEcheance(order.getDateEcheance())
+                .facture(order.getFacture())
+                .dateTransaction(order.getDateTransaction())
+                .dateDernierReglement(order.getDateDernierReglement())
+                .lastSettleVoucher(order.getLastSettleVoucher())
+                .numeroLettrage(order.getNumeroLettrage())
+                .build();
+    }
+
+
+
+
+
+    private static String extractFacturePrefix(String facture) {
+        if (facture != null && facture.length() >= 4) {
+            return facture.substring(0, 4); // First 4 digits of the facture
+        }
+        return ""; // Default empty string if facture is null or too short
+    }
+//    public static <T> List<List<T>> splitIntoBatches(List<T> items, int batchSize) {
+//        int totalSize = items.size();
+//        int batchNums = (totalSize + batchSize - 1) / batchSize;
+//
+//        List<List<T>> batches = new ArrayList<>();
+//        for (int i = 0; i < batchNums; i++) {
+//            int start = i * batchSize;
+//            int end = Math.min(totalSize, (i + 1) * batchSize);
+//            batches.add(items.subList(start, end));
+//        }
+//
+//        return batches;
+//    }
+
+
+    public static void shutdownExecutor(ExecutorService executorServicee) {
+        try {
+            executorServicee.shutdown();
+            if (!executorServicee.awaitTermination(60, TimeUnit.SECONDS)) {
+                executorServicee.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executorServicee.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
 }
+

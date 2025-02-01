@@ -1,10 +1,10 @@
 package lettrage.example.lettrage.model;
 
 public enum Type {
-    ACOMPT,
+    ACOMPTE,
     DTX,
     GENERAL,
     LETTRE,
     PARTIELEMENT_LETTRE,
-    NO_LETTRE
+    NON_LETTRE
 }
