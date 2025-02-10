@@ -64,6 +64,14 @@
 			<artifactId>poi-ooxml</artifactId>
 			<version>5.3.0</version>
 		</dependency>
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-csv</artifactId>
+			<version>1.10.0</version>
+		</dependency>
+
+
+
 
 	</dependencies>
 
@@ -76,14 +84,7 @@
                     <source>19</source>
                     <target>19</target>
                 </configuration>
-                <!--				<configuration>-->
-<!--					<annotationProcessorPaths>-->
-<!--						<path>-->
-<!--							<groupId>org.projectlombok</groupId>-->
-<!--							<artifactId>lombok</artifactId>-->
-<!--						</path>-->
-<!--					</annotationProcessorPaths>-->
-<!--				</configuration>-->
+
 			</plugin>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
@@ -96,6 +97,19 @@
 						</exclude>
 					</excludes>
 				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.openrewrite.maven</groupId>
+				<artifactId>rewrite-maven-plugin</artifactId>
+				<version>6.0.5</version>
+
+				<dependencies>
+					<dependency>
+						<groupId>org.openrewrite.recipe</groupId>
+						<artifactId>rewrite-spring</artifactId>
+						<version>6.0.2</version>
+					</dependency>
+				</dependencies>
 			</plugin>
 		</plugins>
 	</build>

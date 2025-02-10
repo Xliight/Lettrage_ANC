@@ -1,14 +1,19 @@
 package lettrage.example.lettrage.config;
 
 import lettrage.example.lettrage.model.Order;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DateUtil;
+import org.apache.poi.util.IOUtils;
 import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
@@ -17,8 +22,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
+
 import java.util.stream.Collectors;
 
 
@@ -31,17 +35,17 @@ public class OrderProcessor {
 
     public static List<Order> getOrdersFromExcel(InputStream inputStream) {
         List<Order> orders = new ArrayList<>();
+        IOUtils.setByteArrayMaxOverride(500_000_000); // Increase limit to 200 MB
 
         try {
             XSSFWorkbook workbook = new XSSFWorkbook(inputStream);
-            XSSFSheet sheet = workbook.getSheet("orders");
+            XSSFSheet sheet = workbook.getSheet("Feuil1");
             int rowws = sheet.getLastRowNum();  // Get the last row number
 
             // Loop through rows, skipping the header (start at row 1)
             for (int r = 1; r <= rowws; r++) {
                 Order order = new Order();
                 XSSFRow row1 = sheet.getRow(r);
-
                 // Ensure the row is not null to avoid NullPointerException
                 if (row1 != null) {
                     // Process each cell based on its index and type
@@ -194,40 +198,47 @@ public class OrderProcessor {
     }
 
 
-
-
-
     private static String extractFacturePrefix(String facture) {
         if (facture != null && facture.length() >= 4) {
             return facture.substring(0, 4); // First 4 digits of the facture
         }
-        return ""; // Default empty string if facture is null or too short
+        return "";
     }
-//    public static <T> List<List<T>> splitIntoBatches(List<T> items, int batchSize) {
-//        int totalSize = items.size();
-//        int batchNums = (totalSize + batchSize - 1) / batchSize;
-//
-//        List<List<T>> batches = new ArrayList<>();
-//        for (int i = 0; i < batchNums; i++) {
-//            int start = i * batchSize;
-//            int end = Math.min(totalSize, (i + 1) * batchSize);
-//            batches.add(items.subList(start, end));
-//        }
-//
-//        return batches;
-//    }
 
+    public static void writeOrdersToCsv(List<Order> orders, String filePath) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath));
+             CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(
+                     "CompteClient", "ProfilValidation", "Montant", "MontantRegle", "Devise",
+                     "Settlement", "NumeroDocument", "OrdrePaiement", "DateDocument",
+                     "DocumentNum", "DateEcheance", "Facture", "DateTransaction",
+                     "DateDernierReglement", "LastSettleVoucher", "NumeroLettrage"))) {
 
-    public static void shutdownExecutor(ExecutorService executorServicee) {
-        try {
-            executorServicee.shutdown();
-            if (!executorServicee.awaitTermination(60, TimeUnit.SECONDS)) {
-                executorServicee.shutdownNow();
+            // Loop through the orders and write each order to the CSV
+            for (Order order : orders) {
+                csvPrinter.printRecord(
+                        order.getCompteClient(),
+                        order.getProfilValidation(),
+                        order.getMontant(),
+                        order.getMontantRegle(),
+                        order.getDevise(),
+                        order.getSettlement(),
+                        order.getNumeroDocument(),
+                        order.getOrdrePaiement(),
+                        order.getDateDocument(),
+                        order.getDocumentNum(),
+                        order.getDateEcheance(),
+                        order.getFacture(),
+                        order.getDateTransaction(),
+                        order.getDateDernierReglement(),
+                        order.getLastSettleVoucher(),
+                        order.getNumeroLettrage()
+                );
             }
-        } catch (InterruptedException e) {
-            executorServicee.shutdownNow();
-            Thread.currentThread().interrupt();
+            csvPrinter.flush();
+        } catch (IOException e) {
+            System.out.println("Error while writing CSV file: " + e.getMessage());
         }
     }
+
 }
 
